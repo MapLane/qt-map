@@ -4,7 +4,7 @@
 #include <QMapboxGL>
 #include <QtGlobal>
 
-#include "uWS/uWS.h"
+#include "locationsocket.hpp"
 
 // XXX http://stackoverflow.com/questions/24899558/how-to-check-qt-version-to-include-different-header#comment59591604_29887388
 #if QT_VERSION >= 0x050400
@@ -35,7 +35,7 @@ class MapWindow : public QGLWidget
     Q_OBJECT
 
 public:
-    MapWindow(const QMapboxGLSettings &);
+    MapWindow(const QMapboxGLSettings &, LocationSocket &);
 
     void selfTest();
 
@@ -43,7 +43,7 @@ public slots:
     void mapUpdated(double *pos);
     // TODO: make parameter a tuple type.
 signals:
-    void locationUpdated(double *pos);
+    void mapReady();
 
 protected slots:
     void animationValueChanged();
@@ -85,9 +85,10 @@ private:
     bool m_sourceAdded = false;
 
     double *pos;
-    uWS::Hub hub;
-    bool needToUpdate = false;
-    bool initialized = false;
+//    bool needToUpdate = false;
+
+    QMapboxGLCameraOptions options;
+    QMapbox::Coordinate coordinate;
 };
 
 #endif

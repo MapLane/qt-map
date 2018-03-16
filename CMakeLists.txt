@@ -26,7 +26,6 @@ add_library(${PROJECT_NAME} SHARED
 
 include_directories(
         ${MBLIB}/include
-        ${PROJECT_NAME}/include
         ${OPENSSL_INCLUDE_DIR}
 )
 target_link_libraries(${PROJECT_NAME}

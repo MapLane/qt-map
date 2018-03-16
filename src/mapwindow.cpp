@@ -11,54 +11,28 @@
 
 #if QT_VERSION >= 0x050000
 #include <QWindow>
+#include <iostream>
+
 #endif
 
 int kAnimationDuration = 10000;
 
 
-std::vector<std::string> SplitString(const std::string& s, const std::string& c) {
-    std::vector<std::string> result;
-    std::string::size_type pos1, pos2;
-    pos2 = s.find(c);
-    pos1 = 0;
-    while(std::string::npos != pos2) {
-        result.push_back(s.substr(pos1, pos2-pos1));
-
-        pos1 = pos2 + c.size();
-        pos2 = s.find(c, pos1);
-    }
-    if(pos1 != s.length()) {
-        result.push_back(s.substr(pos1));
-    }
-    return result;
-}
-
-MapWindow::MapWindow(const QMapboxGLSettings &settings)
+MapWindow::MapWindow(const QMapboxGLSettings &settings, LocationSocket &socket)
     : m_settings(settings)
 {
     setWindowIcon(QIcon(":icon.png"));
-    connect(this, SIGNAL(locationUpdated(double *)), this, SLOT(mapUpdated(double *)));
-
-    hub.onMessage([this](uWS::WebSocket<uWS::CLIENT> *ws, char *message, size_t length, uWS::OpCode opCode) {
-        std::string messageStr = std::string(message, length);
-        std::vector<std::string> positions = SplitString(messageStr, ",");
-        double mapPos[3];
-        for (int i = 0; i < positions.size(); i++) {
-            mapPos[i] = std::stod(positions[i]);
-        }
-        if (this->initialized) {
-            emit this->locationUpdated(mapPos);
-        }
-    });
-
-    hub.connect("ws://10.2.133.251:3000");
-    hub.run();
+    connect(this, &MapWindow::mapReady, &socket, &LocationSocket::mapInitialized);
 }
 
-void MapWindow::mapUpdated(double *pos) {
+void MapWindow::mapUpdated(double *pos)
+{
     this->pos = pos;
-    this->needToUpdate = true;
-    this->paintGL();
+//    this->needToUpdate = true;
+//    if (needToUpdate) {
+    updateCam();
+//        needToUpdate = false;
+//    }
 }
 
 void MapWindow::selfTest()
@@ -76,7 +50,8 @@ void MapWindow::selfTest()
     }
 }
 
-qreal MapWindow::pixelRatio() {
+qreal MapWindow::pixelRatio()
+{
 #if QT_VERSION >= 0x050600
     return devicePixelRatioF();
 #elif QT_VERSION >= 0x050000
@@ -471,7 +446,7 @@ void MapWindow::initializeGL()
         setWindowTitle(QString("Mapbox GL: ") + styleUrl);
     }
 
-//    m_map->setZoom(19);
+    m_map->setZoom(19);
 
     m_bearingAnimation = new QPropertyAnimation(m_map.data(), "bearing");
     m_zoomAnimation = new QPropertyAnimation(m_map.data(), "zoom");
@@ -479,17 +454,17 @@ void MapWindow::initializeGL()
     connect(m_zoomAnimation, SIGNAL(finished()), this, SLOT(animationFinished()));
     connect(m_zoomAnimation, SIGNAL(valueChanged(const QVariant&)), this, SLOT(animationValueChanged()));
 
-//    initialized = true;
+    emit mapReady();
 }
 
-void MapWindow::updateCam() {
-    QMapboxGLCameraOptions options;
-    QMapbox::Coordinate coordinate;
+void MapWindow::updateCam()
+{
     coordinate.first = this->pos[MapPos::LAT];
     coordinate.second = this->pos[MapPos::LON];
     options.center = QVariant::fromValue<QMapbox::Coordinate>(coordinate);
     options.angle = QVariant::fromValue<double>(this->pos[MapPos::EULER]);
     m_map->jumpTo(options);
+//    qDebug() << coordinate << "\n" << options.angle;
 }
 
 void MapWindow::paintGL()
@@ -499,9 +474,5 @@ void MapWindow::paintGL()
 #if QT_VERSION >= 0x050400
     m_map->setFramebufferObject(defaultFramebufferObject(), size() * pixelRatio());
 #endif
-    if (needToUpdate) {
-        updateCam();
-        needToUpdate = false;
-    }
     m_map->render();
 }
